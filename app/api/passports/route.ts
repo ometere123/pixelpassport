@@ -63,7 +63,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ passport: data }, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Internal error";
+    const msg =
+      err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null && "message" in err
+        ? String((err as { message: unknown }).message)
+        : JSON.stringify(err);
+    console.error("[POST /api/passports]", err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
