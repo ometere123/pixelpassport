@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readContract, parseContractResult } from "@/lib/genlayer/live";
+import { readContract, parseContractResult, tsOrNull } from "@/lib/genlayer/live";
 
 /**
  * Mirror an on-chain RuneArena battle into Supabase.
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       xp_earned: Number(onchain.xp_earned ?? 0),
       narration: Array.isArray(onchain.narration) ? onchain.narration : [],
       genlayer_tx_id: tx_hash ?? null,
-      finished_at: (onchain.finished_at as string | null) ?? null,
+      finished_at: tsOrNull(onchain.finished_at),
     };
 
     const { data, error } = await db.from("rune_battles").upsert(row, { onConflict: "id" }).select().single();

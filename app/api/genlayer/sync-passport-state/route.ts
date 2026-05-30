@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readContract, parseContractResult } from "@/lib/genlayer/live";
+import { readContract, parseContractResult, tsOrNull } from "@/lib/genlayer/live";
 
 /**
  * Mirror a passport's mutable state (XP, level, reputation, achievements)
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
           wins: Number(g.wins ?? 0),
           losses: Number(g.losses ?? 0),
           items_earned: Number(g.items_earned ?? 0),
-          last_played: (g.last_played as string | null) ?? null,
+          last_played: tsOrNull(g.last_played),
         },
         { onConflict: "passport_id,game_id" }
       );

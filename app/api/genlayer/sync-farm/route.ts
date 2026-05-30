@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readContract, parseContractResult } from "@/lib/genlayer/live";
+import { readContract, parseContractResult, tsOrNull } from "@/lib/genlayer/live";
 
 /**
  * Mirror an on-chain ChainFarm into Supabase.
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
           plot_index: Number(p.index ?? 0),
           status: String(p.status ?? "empty"),
           crop: (p.crop as string | null) ?? null,
-          planted_at: (p.planted_at as string | null) ?? null,
-          ready_at: (p.ready_at as string | null) ?? null,
+          planted_at: tsOrNull(p.planted_at),
+          ready_at: tsOrNull(p.ready_at),
           applied_item_id: (p.applied_item_id as string | null) ?? null,
           yield_modifier: Number(p.yield_modifier ?? 1.0),
         }, { onConflict: "farm_id,plot_index" });

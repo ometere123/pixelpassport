@@ -74,6 +74,13 @@ export async function readContract(
  * Parse a contract response that may be a JSON string OR an already-parsed object.
  * Most contract methods return `json.dumps(...)` so we get a string back.
  */
+/** Postgres TIMESTAMPTZ rejects empty strings — convert "" / undefined to null. */
+export function tsOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+
 export function parseContractResult<T = unknown>(raw: unknown): T | null {
   if (raw == null) return null;
   if (typeof raw === "string") {

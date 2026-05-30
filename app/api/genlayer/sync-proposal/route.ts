@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readContract, parseContractResult } from "@/lib/genlayer/live";
+import { readContract, parseContractResult, tsOrNull } from "@/lib/genlayer/live";
 
 /**
  * Mirror an on-chain EcosystemGovernance proposal into Supabase.
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         status: String(onchain.status ?? "pending"),
         votes_for: Number(onchain.votes_for ?? 0),
         votes_against: Number(onchain.votes_against ?? 0),
-        executed_at: (onchain.executed_at as string | null) || null,
+        executed_at: tsOrNull(onchain.executed_at),
       },
       { onConflict: "id" }
     ).select().single();

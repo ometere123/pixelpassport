@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readContract, parseContractResult } from "@/lib/genlayer/live";
+import { readContract, parseContractResult, tsOrNull } from "@/lib/genlayer/live";
 
 /**
  * Mirror an on-chain VoidRun into Supabase.
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       score: Number(run.score ?? 0),
       reward_item_id: (run.reward_item_id as string | null) ?? null,
       genlayer_tx_id: tx_hash ?? null,
-      finished_at: (run.finished_at as string | null) ?? null,
+      finished_at: tsOrNull(run.finished_at),
     }, { onConflict: "id" }).select().single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
