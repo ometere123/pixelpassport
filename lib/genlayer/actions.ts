@@ -35,6 +35,119 @@ function checkContractError(result: unknown) {
   if (err) throw new Error(`Contract: ${err}`);
 }
 
+/* ─── Passport ─── */
+
+export async function awardXp(
+  write: WriteFn,
+  args: { passportId: string; gameId: string; xp: number; reason: string }
+) {
+  const tx = await write("PASSPORT_REGISTRY", "award_xp", [
+    args.passportId,
+    args.gameId,
+    args.xp,
+    args.reason,
+  ]);
+  checkContractError(tx.result);
+  const synced = await sync("sync-passport-state", {
+    passport_id: args.passportId,
+    tx_hash: tx.hash,
+    action: "award_xp",
+    payload: { game_id: args.gameId, xp: args.xp, reason: args.reason },
+  });
+  return { tx, ...synced };
+}
+
+export async function awardAchievement(
+  write: WriteFn,
+  args: {
+    passportId: string;
+    gameId: string;
+    achievement: { name: string; description?: string; icon?: string; rarity?: string };
+  }
+) {
+  const tx = await write("PASSPORT_REGISTRY", "award_achievement", [
+    args.passportId,
+    args.gameId,
+    JSON.stringify(args.achievement),
+  ]);
+  checkContractError(tx.result);
+  const synced = await sync("sync-passport-state", {
+    passport_id: args.passportId,
+    tx_hash: tx.hash,
+    action: "award_achievement",
+    payload: { game_id: args.gameId, achievement: args.achievement },
+  });
+  return { tx, ...synced };
+}
+
+/* ─── Governance ─── */
+
+export async function createProposal(
+  write: WriteFn,
+  args: {
+    proposalId: string;
+    proposalType: "add_game" | "item_class" | "translation_rule" | "general";
+    title: string;
+    description: string;
+    payload?: Record<string, unknown>;
+    passportId: string;
+  }
+) {
+  const tx = await write("ECOSYSTEM_GOVERNANCE", "create_proposal", [
+    args.proposalId,
+    args.proposalType,
+    JSON.stringify({
+      title: args.title,
+      description: args.description,
+      payload: args.payload ?? {},
+    }),
+  ]);
+  checkContractError(tx.result);
+  const synced = await sync("sync-proposal", {
+    proposal_id: args.proposalId,
+    passport_id: args.passportId,
+    proposal_type: args.proposalType,
+    tx_hash: tx.hash,
+    action: "create_proposal",
+  });
+  return { tx, ...synced };
+}
+
+export async function voteOnProposal(
+  write: WriteFn,
+  args: { proposalId: string; support: boolean; reason: string; passportId: string }
+) {
+  const tx = await write("ECOSYSTEM_GOVERNANCE", "vote", [
+    args.proposalId,
+    args.support,
+    args.reason,
+  ]);
+  checkContractError(tx.result);
+  const synced = await sync("sync-proposal", {
+    proposal_id: args.proposalId,
+    passport_id: args.passportId,
+    tx_hash: tx.hash,
+    action: "vote",
+    payload: { support: args.support, reason: args.reason },
+  });
+  return { tx, ...synced };
+}
+
+export async function executeProposal(
+  write: WriteFn,
+  args: { proposalId: string; passportId: string }
+) {
+  const tx = await write("ECOSYSTEM_GOVERNANCE", "execute_proposal", [args.proposalId]);
+  checkContractError(tx.result);
+  const synced = await sync("sync-proposal", {
+    proposal_id: args.proposalId,
+    passport_id: args.passportId,
+    tx_hash: tx.hash,
+    action: "execute_proposal",
+  });
+  return { tx, ...synced };
+}
+
 /* ─── Item ─── */
 
 export async function mintItem(

@@ -5,7 +5,7 @@ import { BattleNarrationPanel } from "./BattleNarrationPanel";
 import { ArenaActionPanel } from "./ArenaActionPanel";
 import { BattleResultModal } from "./BattleResultModal";
 import { useGenLayer } from "@/lib/genlayer/useGenLayer";
-import { submitBattleAction, claimBattleReward } from "@/lib/genlayer/actions";
+import { submitBattleAction, claimBattleReward, awardXp, awardAchievement } from "@/lib/genlayer/actions";
 
 interface RuneArenaBattleProps {
   battle: RuneBattle;
@@ -67,13 +67,44 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
         setPlayerHP(next.playerHP);
         setOppHP(next.oppHP);
         if (out.battle.status === "finished") {
-          // Try to claim reward on-chain
+          const playerWon = out.battle.winner === "player";
           setPhase("claiming");
-          try {
-            const claim = await claimBattleReward(write, { battleId: battle.id, passportId });
-            if (claim.battle) onUpdate(claim.battle);
-          } catch (claimErr) {
-            console.error("Reward claim failed", claimErr);
+          if (playerWon) {
+            try {
+              const claim = await claimBattleReward(write, { battleId: battle.id, passportId });
+              if (claim.battle) onUpdate(claim.battle);
+              // Award XP + first-win achievement on-chain
+              const xpAmount = Number((out.battle as { xp_earned?: number }).xp_earned ?? 250);
+              if (xpAmount > 0) {
+                try {
+                  await awardXp(write, {
+                    passportId,
+                    gameId: "rune-arena",
+                    xp: xpAmount,
+                    reason: `RuneArena battle won (${battle.id})`,
+                  });
+                } catch (xpErr) {
+                  console.error("XP award failed", xpErr);
+                }
+              }
+              try {
+                await awardAchievement(write, {
+                  passportId,
+                  gameId: "rune-arena",
+                  achievement: {
+                    name: "First Blood",
+                    description: "Won your first RuneArena battle",
+                    icon: "⚔️",
+                    rarity: "common",
+                  },
+                });
+              } catch (achErr) {
+                // already_awarded is fine; ignore
+                console.warn("Achievement award:", achErr);
+              }
+            } catch (claimErr) {
+              console.error("Reward claim failed", claimErr);
+            }
           }
           setShowResult(true);
         }
