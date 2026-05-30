@@ -12,7 +12,7 @@ interface RuneArenaBattleProps {
 }
 
 function getInitState(battle: RuneBattle): { playerHP: number; oppHP: number; oppName: string; oppMaxHP: number } {
-  const turns = (battle.turns ?? []) as Record<string, unknown>[];
+  const turns = (battle.turns ?? []) as unknown as Record<string, unknown>[];
   const init = turns[0] ?? {};
   const opp = (init.opponent ?? {}) as Record<string, unknown>;
   return {
