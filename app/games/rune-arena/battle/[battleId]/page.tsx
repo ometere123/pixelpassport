@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAccount } from "wagmi";
+import Link from "next/link";
 import { RuneArenaBattle } from "@/components/rune-arena/RuneArenaBattle";
 import { ArenaLoadoutSelector } from "@/components/rune-arena/ArenaLoadoutSelector";
 import { generateId } from "@/lib/utils/cn";
@@ -15,6 +16,7 @@ export default function BattlePage() {
   const { address } = useAccount();
   const [battle, setBattle] = useState<RuneBattle | null>(null);
   const [passportId, setPassportId] = useState<string | null>(null);
+  const [passportChecked, setPassportChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showLoadout, setShowLoadout] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -22,13 +24,17 @@ export default function BattlePage() {
   const { write, ready } = useGenLayer();
 
   useEffect(() => {
-    if (!address) return;
+    if (!address) {
+      setPassportChecked(true);
+      return;
+    }
     fetch(`/api/passports/by-wallet/${address}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.id) setPassportId(data.id);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPassportChecked(true));
   }, [address]);
 
   useEffect(() => {
@@ -64,10 +70,28 @@ export default function BattlePage() {
     }
   }
 
-  if (loading) {
+  if (loading || !passportChecked) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-2xl animate-spin">⟳</div>
+      </div>
+    );
+  }
+
+  if (!passportId) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <div className="text-4xl mb-4">🪪</div>
+        <h1 className="text-xl font-bold mb-2">No Passport Found</h1>
+        <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+          The wallet <span className="font-mono">{address?.slice(0, 6)}…{address?.slice(-4)}</span> isn&apos;t linked to a passport yet.
+          Create one to enter battle.
+        </p>
+        <Link href="/passport/create"
+          className="inline-block px-6 py-3 rounded-lg font-semibold text-sm hover:opacity-90"
+          style={{ background: "var(--passport-gold)", color: "#090A12" }}>
+          Create Passport
+        </Link>
       </div>
     );
   }
