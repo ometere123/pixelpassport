@@ -11,21 +11,26 @@ interface RuneArenaBattleProps {
   onUpdate: (b: RuneBattle) => void;
 }
 
-export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattleProps) {
-  const [loading, setLoading] = useState(false);
-  const [showResult, setShowResult] = useState(false);
+function getInitState(battle: RuneBattle): { playerHP: number; oppHP: number; oppName: string; oppMaxHP: number } {
+  const turns = (battle.turns ?? []) as Record<string, unknown>[];
+  const init = turns[0] ?? {};
+  const opp = (init.opponent ?? {}) as Record<string, unknown>;
+  return {
+    playerHP:  (init.player_hp  as number) ?? 100,
+    oppHP:     (opp.hp          as number) ?? 100,
+    oppName:   (opp.name        as string) ?? "Opponent",
+    oppMaxHP:  (opp.hp          as number) ?? 100,
+  };
+}
 
-  async function startBattle() {
-    setLoading(true);
-    const res = await fetch(`/api/rune-arena/battles/${battle.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start" }),
-    });
-    const data = await res.json();
-    if (data.battle) onUpdate(data.battle);
-    setLoading(false);
-  }
+export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattleProps) {
+  const init = getInitState(battle);
+  const [playerHP, setPlayerHP] = useState(init.playerHP);
+  const [oppHP,    setOppHP]    = useState(init.oppHP);
+  const [oppMaxHP]              = useState(init.oppMaxHP);
+  const [oppName]               = useState(init.oppName);
+  const [loading,  setLoading]  = useState(false);
+  const [showResult, setShowResult] = useState(false);
 
   async function submitAction(action: string) {
     setLoading(true);
@@ -37,14 +42,16 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
     const data = await res.json();
     if (data.battle) {
       onUpdate(data.battle);
-      if (data.battle.status === "finished") setShowResult(true);
+      // Update HP from API response
+      if (typeof data.player_hp === "number") setPlayerHP(data.player_hp);
+      if (typeof data.opp_hp    === "number") setOppHP(data.opp_hp);
+      if (data.battle.status === "finished")  setShowResult(true);
     }
     setLoading(false);
   }
 
-  const opp = (battle as unknown as Record<string, unknown>).opponent as Record<string, unknown> | undefined;
-  const playerHP = (battle as unknown as Record<string, unknown>).player_hp as number ?? 100;
-  const oppHP = opp?.hp as number ?? 100;
+  const playerPct = Math.max(0, Math.min(100, playerHP));
+  const oppPct    = Math.max(0, Math.min(100, (oppHP / oppMaxHP) * 100));
 
   return (
     <div className="space-y-4">
@@ -57,9 +64,7 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
           </div>
           <div className="text-2xl">⚔️</div>
           <div className="text-right">
-            <div className="text-xs font-mono mb-1" style={{ color: "#F97373" }}>
-              {opp?.name as string ?? "Opponent"}
-            </div>
+            <div className="text-xs font-mono mb-1" style={{ color: "#F97373" }}>Opponent</div>
             <div className="text-2xl font-bold">💀 {oppHP}</div>
           </div>
         </div>
@@ -67,11 +72,17 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
         {/* HP bars */}
         <div className="space-y-2">
           <div className="h-2 rounded-full" style={{ background: "var(--surface-soft)" }}>
-            <div className="h-full rounded-full" style={{ width: `${playerHP}%`, background: "var(--success)" }} />
+            <div className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${playerPct}%`, background: "var(--success, #65D46E)" }} />
           </div>
           <div className="h-2 rounded-full" style={{ background: "var(--surface-soft)" }}>
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, (oppHP / 80) * 100)}%`, background: "var(--rune-red)" }} />
+            <div className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${oppPct}%`, background: "#F97373" }} />
           </div>
+        </div>
+
+        <div className="text-xs mt-2 text-center" style={{ color: "var(--text-muted)" }}>
+          vs {oppName}
         </div>
       </div>
 
@@ -79,13 +90,6 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
       <BattleNarrationPanel narration={battle.narration} />
 
       {/* Actions */}
-      {battle.status === "pending" && (
-        <button onClick={startBattle} disabled={loading}
-          className="w-full py-3 rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50"
-          style={{ background: "#F97373", color: "#090A12" }}>
-          {loading ? "Starting…" : "Start Battle"}
-        </button>
-      )}
       {battle.status === "active" && (
         <ArenaActionPanel onAction={submitAction} loading={loading} loadout={battle.loadout} />
       )}
