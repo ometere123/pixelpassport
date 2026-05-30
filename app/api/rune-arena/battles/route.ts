@@ -16,18 +16,19 @@ export async function POST(req: NextRequest) {
   ];
   const opponent = opponentTemplates[Math.floor(Math.random() * opponentTemplates.length)];
 
+  // Store opponent in turns[0] as initial state so we can reference it during battle
+  const initialState = { type: "init", player_hp: 100, opponent_hp: opponent.hp, opponent };
+
   const battle = {
     id: battle_id,
     passport_id,
     loadout: loadout ?? [],
-    status: "pending",
-    player_hp: 100,
-    opponent,
-    turns: [],
+    status: "active",
+    turns: [initialState],
     winner: null,
     reward_item_id: null,
     xp_earned: 0,
-    narration: [],
+    narration: [`You face ${opponent.name}! Let the battle begin.`],
   };
 
   const { data, error } = await db.from("rune_battles").insert(battle).select().single();
