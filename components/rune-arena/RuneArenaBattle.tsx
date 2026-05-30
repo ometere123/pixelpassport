@@ -5,7 +5,7 @@ import { BattleNarrationPanel } from "./BattleNarrationPanel";
 import { ArenaActionPanel } from "./ArenaActionPanel";
 import { BattleResultModal } from "./BattleResultModal";
 import { useGenLayer } from "@/lib/genlayer/useGenLayer";
-import { submitBattleAction, claimBattleReward, awardXp, awardAchievement } from "@/lib/genlayer/actions";
+import { submitBattleAction, claimBattleReward, awardXp, awardAchievement, startBattle } from "@/lib/genlayer/actions";
 
 interface RuneArenaBattleProps {
   battle: RuneBattle;
@@ -176,6 +176,30 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
         </div>
       )}
 
+      {battle.status === "pending" && (
+        <button
+          onClick={async () => {
+            if (!ready) return;
+            setLoading(true);
+            setError("");
+            setPhase("signing");
+            try {
+              const out = await startBattle(write, { battleId: battle.id, passportId });
+              if (out.battle) onUpdate(out.battle);
+            } catch (err: unknown) {
+              setError(err instanceof Error ? err.message : "Start failed");
+            } finally {
+              setLoading(false);
+              setPhase("idle");
+            }
+          }}
+          disabled={loading}
+          className="w-full py-3 rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50"
+          style={{ background: "#F97373", color: "#090A12" }}
+        >
+          {loading ? "Starting…" : "Start Battle"}
+        </button>
+      )}
       {battle.status === "active" && (
         <ArenaActionPanel onAction={submitAction} loading={loading} loadout={battle.loadout} />
       )}

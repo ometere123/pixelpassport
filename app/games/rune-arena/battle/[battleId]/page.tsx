@@ -6,7 +6,7 @@ import { RuneArenaBattle } from "@/components/rune-arena/RuneArenaBattle";
 import { ArenaLoadoutSelector } from "@/components/rune-arena/ArenaLoadoutSelector";
 import { generateId } from "@/lib/utils/cn";
 import { useGenLayer } from "@/lib/genlayer/useGenLayer";
-import { createBattle } from "@/lib/genlayer/actions";
+import { createBattle, startBattle } from "@/lib/genlayer/actions";
 import type { RuneBattle } from "@/types";
 
 export default function BattlePage() {
@@ -50,13 +50,11 @@ export default function BattlePage() {
     setError("");
     try {
       const newId = generateId("battle");
-      const out = await createBattle(write, {
-        battleId: newId,
-        passportId,
-        loadout,
-      });
-      if (out.battle) {
-        setBattle(out.battle);
+      await createBattle(write, { battleId: newId, passportId, loadout });
+      // Battle is created as "pending" — flip it to "active" immediately
+      const started = await startBattle(write, { battleId: newId, passportId });
+      if (started.battle) {
+        setBattle(started.battle);
         setShowLoadout(false);
       }
     } catch (err: unknown) {
