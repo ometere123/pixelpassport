@@ -5,6 +5,8 @@ import { TranslationReasoningPanel } from "@/components/inventory/TranslationRea
 import Link from "next/link";
 import type { CanonicalItem, ItemTranslation } from "@/types";
 import { rarityColor, gameColor, gameLabel } from "@/lib/utils/cn";
+import { ItemViewer3D } from "@/components/3d/ItemViewer3D";
+import { ItemTranslationMorph } from "@/components/3d/ItemTranslationMorph";
 
 interface PageProps {
   params: Promise<{ itemId: string }>;
@@ -48,8 +50,8 @@ export default async function ItemDetailPage({ params }: PageProps) {
         <div className="lg:col-span-1 space-y-4">
           <div className="rounded-2xl p-6 border"
             style={{ background: "var(--surface)", borderColor: `${gameColor(item.origin_game)}40` }}>
-            <div className="text-5xl text-center mb-4">
-              {item.class === "weapon" ? "⚔️" : item.class === "tool" ? "🔧" : "💎"}
+            <div className="mb-4">
+              <ItemViewer3D item={item} height={220} />
             </div>
             <h1 className="text-xl font-bold text-center mb-1">{item.name}</h1>
             <div className={`text-center text-sm mb-3 ${rarityColor(item.rarity)}`}>{item.rarity}</div>
@@ -106,6 +108,19 @@ export default async function ItemDetailPage({ params }: PageProps) {
 
         {/* Right column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* 3D translation morph — protocol moment in physical form */}
+          {translations.length > 0 && (
+            <div>
+              <div className="flex items-baseline justify-between mb-4">
+                <h2 className="font-bold">Cross-World Forms</h2>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Click a tab to morph the model
+                </span>
+              </div>
+              <ItemTranslationMorph item={item} translations={translations} />
+            </div>
+          )}
+
           {/* Translation history */}
           {translations.length > 0 && (
             <div>

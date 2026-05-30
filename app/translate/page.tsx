@@ -7,6 +7,7 @@ import { GAMES } from "@/lib/games/registry";
 import { gameColor, gameLabel } from "@/lib/utils/cn";
 import { useGenLayer } from "@/lib/genlayer/useGenLayer";
 import { translateItem } from "@/lib/genlayer/actions";
+import { ItemViewer3D } from "@/components/3d/ItemViewer3D";
 
 function TranslateForm() {
   const { address, isConnected } = useAccount();
@@ -162,10 +163,24 @@ function TranslateForm() {
       </div>
 
       {/* Result */}
-      {result && (
+      {result && selectedItem && (
         <div className="rounded-2xl p-6 border" style={{ background: "var(--surface)", borderColor: "rgba(56,217,248,0.3)" }}>
           <div className="text-xs font-mono mb-4" style={{ color: "var(--pixel-cyan)" }}>
             ⬡ GENLAYER TRANSLATION RESULT
+          </div>
+
+          {/* 3D preview of the translated form */}
+          <div className="mb-5 rounded-xl overflow-hidden" style={{ background: "rgba(9,10,18,0.4)" }}>
+            <ItemViewer3D
+              item={{
+                ...selectedItem,
+                name: result.translated_name,
+                class: result.translated_class,
+                power_level: result.translated_power_level,
+                origin_game: targetGame as typeof selectedItem.origin_game,
+              }}
+              height={280}
+            />
           </div>
 
           <h3 className="text-2xl font-bold mb-1">{result.translated_name}</h3>

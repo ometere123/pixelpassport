@@ -4,6 +4,7 @@ import { EcosystemXPBar } from "@/components/passport/EcosystemXPBar";
 import { AchievementBadge } from "@/components/ui/AchievementBadge";
 import { ActivityFeed } from "@/components/ui/ActivityFeed";
 import { GenLayerProofPanel } from "@/components/proof/GenLayerProofPanel";
+import { PassportHologram } from "@/components/3d/PassportHologram";
 import type { Passport, Achievement, ActivityEntry } from "@/types";
 
 interface PageProps {
@@ -51,6 +52,7 @@ export default async function PassportProfilePage({ params }: PageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: passport card */}
         <div className="lg:col-span-1 space-y-4">
+          <PassportHologram passport={passport} height={260} />
           <PassportCard passport={passport} />
           <EcosystemXPBar xp={passport.ecosystem_xp} level={passport.level} />
           <GenLayerProofPanel
