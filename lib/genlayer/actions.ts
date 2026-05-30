@@ -373,13 +373,12 @@ export async function harvestCrop(
 
 export async function startRun(
   write: WriteFn,
-  args: { runId: string; passportId: string; loadout: string[]; totalRooms?: number }
+  args: { runId: string; passportId: string; loadout: string[] }
 ) {
   const tx = await write("VOID_RUN", "start_run", [
     args.runId,
     args.passportId,
     JSON.stringify(args.loadout),
-    args.totalRooms ?? 5,
   ]);
   checkContractError(tx.result);
   const synced = await sync("sync-run", {
@@ -408,12 +407,11 @@ export async function generateRoom(
 
 export async function judgePuzzleAnswer(
   write: WriteFn,
-  args: { runId: string; roomIndex: number; answer: string; passportId: string }
+  args: { runId: string; roomIndex?: number; answer: string; passportId: string }
 ) {
   const tx = await write("VOID_RUN", "judge_puzzle_answer", [
     args.runId,
-    args.roomIndex,
-    args.answer,
+    JSON.stringify({ answer: args.answer, room_index: args.roomIndex }),
   ]);
   checkContractError(tx.result);
   const synced = await sync("sync-run", {

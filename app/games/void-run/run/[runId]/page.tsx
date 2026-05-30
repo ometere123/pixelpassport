@@ -46,7 +46,6 @@ export default function VoidRunPage() {
         runId: newId,
         passportId,
         loadout: [],
-        totalRooms: 5,
       });
       // Now generate the first room
       const withRoom = await generateRoom(write, { runId: newId, passportId });
