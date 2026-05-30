@@ -5,11 +5,34 @@
  * the standard PassportCard. Auto-rotates gently; drag to spin manually.
  */
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Suspense, useRef } from "react";
 import { OrbitControls, Float, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { Passport } from "@/types";
+
+/** Loads the passport avatar URL as a Three.js texture (suspends until ready). */
+function AvatarDisc({ url }: { url: string }) {
+  const texture = useLoader(THREE.TextureLoader, url, (loader) => {
+    (loader as THREE.TextureLoader).crossOrigin = "anonymous";
+  });
+  return (
+    <mesh position={[-0.85, 0.35, 0.075]} rotation={[Math.PI / 2, 0, 0]}>
+      <cylinderGeometry args={[0.32, 0.32, 0.01, 32]} />
+      <meshStandardMaterial map={texture} emissive="#ffffff" emissiveIntensity={0.15} />
+    </mesh>
+  );
+}
+
+/** Cyan fallback when there's no avatar URL. */
+function FallbackAvatarDisc() {
+  return (
+    <mesh position={[-0.85, 0.35, 0.075]} rotation={[Math.PI / 2, 0, 0]}>
+      <cylinderGeometry args={[0.32, 0.32, 0.01, 32]} />
+      <meshStandardMaterial color="#38D9F8" emissive="#38D9F8" emissiveIntensity={1.5} />
+    </mesh>
+  );
+}
 
 function PassportMesh({ passport }: { passport: Passport }) {
   const ref = useRef<THREE.Group>(null);
@@ -59,19 +82,19 @@ function PassportMesh({ passport }: { passport: Passport }) {
         <meshStandardMaterial color="#F6C85F" emissive="#F6C85F" emissiveIntensity={1.4} />
       </mesh>
 
-      {/* Avatar disc (flat against face) */}
+      {/* Avatar ring (dark backing) */}
       <mesh position={[-0.85, 0.35, 0.07]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.34, 0.34, 0.01, 32]} />
         <meshStandardMaterial color="#000" />
       </mesh>
-      <mesh position={[-0.85, 0.35, 0.075]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.32, 0.32, 0.01, 32]} />
-        <meshStandardMaterial
-          color="#38D9F8"
-          emissive="#38D9F8"
-          emissiveIntensity={1.5}
-        />
-      </mesh>
+      {/* Avatar disc — texture if available, else cyan fallback */}
+      <Suspense fallback={<FallbackAvatarDisc />}>
+        {passport.avatar_url ? (
+          <AvatarDisc url={passport.avatar_url} />
+        ) : (
+          <FallbackAvatarDisc />
+        )}
+      </Suspense>
 
       {/* Username text */}
       <Text
