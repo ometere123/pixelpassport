@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/inventory", label: "Inventory" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/activity", label: "Activity" },
+  { href: "/account", label: "Account" },
 ];
 
 export function AppNav() {

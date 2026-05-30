@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
 import { AppNav } from "@/components/layout/AppNav";
+import { KeyBackupBanner } from "@/components/layout/KeyBackupBanner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
         <Providers>
           <AppNav />
+          <KeyBackupBanner />
           <main className="flex-1">{children}</main>
         </Providers>
       </body>

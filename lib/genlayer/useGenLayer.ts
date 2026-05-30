@@ -12,25 +12,13 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
+import { createClient, createAccount } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { CONTRACTS, type ContractName, parseContractResult } from "./live";
+import { loadOrCreateKey } from "./keyStore";
 
 const ENDPOINT = (process.env.NEXT_PUBLIC_GENLAYER_RPC_URL ||
   "https://studio.genlayer.com/api") as `http${string}`;
-
-const STORAGE_KEY = "pixelpassport.genlayer.privateKey";
-
-function loadOrCreateKey(): `0x${string}` {
-  if (typeof window === "undefined") return generatePrivateKey();
-  const existing = window.localStorage.getItem(STORAGE_KEY);
-  if (existing && /^0x[0-9a-fA-F]{64}$/.test(existing)) {
-    return existing as `0x${string}`;
-  }
-  const fresh = generatePrivateKey();
-  window.localStorage.setItem(STORAGE_KEY, fresh);
-  return fresh;
-}
 
 export interface TxResult {
   hash: string;
@@ -43,10 +31,20 @@ export function useGenLayer() {
   const [address, setAddress] = useState<string>("");
 
   useEffect(() => {
-    const key = loadOrCreateKey();
-    const acc = createAccount(key);
-    setAccount(acc);
-    setAddress(acc.address);
+    function refresh() {
+      const key = loadOrCreateKey();
+      const acc = createAccount(key);
+      setAccount(acc);
+      setAddress(acc.address);
+    }
+    refresh();
+    // React to import / regenerate from other tabs or the Account page
+    window.addEventListener("pixelpassport:keychange", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("pixelpassport:keychange", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   const read = useCallback(
