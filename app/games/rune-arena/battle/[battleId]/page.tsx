@@ -5,6 +5,8 @@ import { useAccount } from "wagmi";
 import { RuneArenaBattle } from "@/components/rune-arena/RuneArenaBattle";
 import { ArenaLoadoutSelector } from "@/components/rune-arena/ArenaLoadoutSelector";
 import { generateId } from "@/lib/utils/cn";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { createBattle } from "@/lib/genlayer/actions";
 import type { RuneBattle } from "@/types";
 
 export default function BattlePage() {
@@ -15,6 +17,9 @@ export default function BattlePage() {
   const [passportId, setPassportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoadout, setShowLoadout] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const { write, ready } = useGenLayer();
 
   useEffect(() => {
     if (!address) return;
@@ -40,17 +45,24 @@ export default function BattlePage() {
   }, [battleId]);
 
   async function handleCreateBattle(loadout: string[]) {
-    if (!passportId) return;
-    const newId = generateId("battle");
-    const res = await fetch("/api/rune-arena/battles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ battle_id: newId, passport_id: passportId, loadout }),
-    });
-    const data = await res.json();
-    if (data.battle) {
-      setBattle(data.battle);
-      setShowLoadout(false);
+    if (!passportId || !ready) return;
+    setCreating(true);
+    setError("");
+    try {
+      const newId = generateId("battle");
+      const out = await createBattle(write, {
+        battleId: newId,
+        passportId,
+        loadout,
+      });
+      if (out.battle) {
+        setBattle(out.battle);
+        setShowLoadout(false);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create battle");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -67,6 +79,19 @@ export default function BattlePage() {
       <div className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold mb-6">Select Loadout</h1>
         <ArenaLoadoutSelector passportId={passportId ?? ""} onConfirm={handleCreateBattle} />
+        {creating && (
+          <div className="mt-4 p-4 rounded-xl text-sm text-center shimmer"
+            style={{ background: "rgba(56,217,248,0.05)", color: "var(--pixel-cyan)" }}>
+            ⬡ Submitting battle to RuneArena contract on GenLayer…
+            <div className="text-xs mt-2 opacity-70">(consensus may take 30–60s)</div>
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 p-3 rounded-lg text-sm"
+            style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+            {error}
+          </div>
+        )}
       </div>
     );
   }

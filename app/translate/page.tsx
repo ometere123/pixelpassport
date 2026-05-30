@@ -5,15 +5,20 @@ import { useSearchParams } from "next/navigation";
 import type { CanonicalItem, TranslationResult } from "@/types";
 import { GAMES } from "@/lib/games/registry";
 import { gameColor, gameLabel } from "@/lib/utils/cn";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { translateItem } from "@/lib/genlayer/actions";
 
 function TranslateForm() {
   const { address, isConnected } = useAccount();
+  const { write, ready } = useGenLayer();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CanonicalItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CanonicalItem | null>(null);
   const [targetGame, setTargetGame] = useState<string>("");
   const [translating, setTranslating] = useState(false);
   const [result, setResult] = useState<TranslationResult | null>(null);
+  const [error, setError] = useState("");
+  const [txHash, setTxHash] = useState("");
   const [passportId, setPassportId] = useState<string | null>(null);
 
   const preselectedItemId = searchParams.get("item");
@@ -40,17 +45,24 @@ function TranslateForm() {
   }, [address, isConnected, preselectedItemId, preselectedTarget]);
 
   async function translate() {
-    if (!selectedItem || !targetGame || !passportId) return;
+    if (!selectedItem || !targetGame || !passportId || !ready) return;
     setTranslating(true);
     setResult(null);
-    const res = await fetch(`/api/items/${selectedItem.id}/translate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target_game: targetGame, passport_id: passportId }),
-    });
-    const d = await res.json();
-    if (d.translation) setResult(d.translation as TranslationResult);
-    setTranslating(false);
+    setError("");
+    setTxHash("");
+    try {
+      const out = await translateItem(write, {
+        itemId: selectedItem.id,
+        targetGame,
+        passportId,
+      });
+      setTxHash(out.tx.hash);
+      if (out.translation) setResult(out.translation as TranslationResult);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Translation failed");
+    } finally {
+      setTranslating(false);
+    }
   }
 
   const availableTargets = GAMES.filter((g) => g.id !== selectedItem?.origin_game);
@@ -129,7 +141,22 @@ function TranslateForm() {
         {translating && (
           <div className="mt-4 p-4 rounded-xl text-sm text-center shimmer"
             style={{ background: "rgba(56,217,248,0.05)", color: "var(--pixel-cyan)" }}>
-            ⬡ GenLayer is reasoning about cross-world adaptation…
+            ⬡ GenLayer LLM is reasoning about cross-world adaptation…
+            <div className="text-xs mt-2 opacity-70">(consensus may take 30–60s)</div>
+          </div>
+        )}
+
+        {txHash && (
+          <div className="mt-3 p-2 rounded text-xs font-mono break-all"
+            style={{ background: "var(--surface-soft)", color: "var(--text-muted)" }}>
+            tx: {txHash}
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 p-3 rounded-lg text-sm"
+            style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+            {error}
           </div>
         )}
       </div>

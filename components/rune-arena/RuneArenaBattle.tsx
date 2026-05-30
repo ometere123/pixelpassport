@@ -4,6 +4,8 @@ import type { RuneBattle } from "@/types";
 import { BattleNarrationPanel } from "./BattleNarrationPanel";
 import { ArenaActionPanel } from "./ArenaActionPanel";
 import { BattleResultModal } from "./BattleResultModal";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { submitBattleAction, claimBattleReward } from "@/lib/genlayer/actions";
 
 interface RuneArenaBattleProps {
   battle: RuneBattle;
@@ -23,31 +25,65 @@ function getInitState(battle: RuneBattle): { playerHP: number; oppHP: number; op
   };
 }
 
+function deriveHP(battle: RuneBattle, init: { playerHP: number; oppHP: number; oppMaxHP: number }) {
+  const turns = (battle.turns ?? []) as unknown as Record<string, unknown>[];
+  if (turns.length <= 1) return { playerHP: init.playerHP, oppHP: init.oppHP };
+  const last = turns[turns.length - 1];
+  return {
+    playerHP: Number(last.player_hp_after ?? init.playerHP),
+    oppHP: Number(last.opp_hp_after ?? init.oppHP),
+  };
+}
+
 export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattleProps) {
+  const { write, ready } = useGenLayer();
   const init = getInitState(battle);
-  const [playerHP, setPlayerHP] = useState(init.playerHP);
-  const [oppHP,    setOppHP]    = useState(init.oppHP);
+  const derived = deriveHP(battle, init);
+  const [playerHP, setPlayerHP] = useState(derived.playerHP);
+  const [oppHP, setOppHP]       = useState(derived.oppHP);
   const [oppMaxHP]              = useState(init.oppMaxHP);
   const [oppName]               = useState(init.oppName);
-  const [loading,  setLoading]  = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [phase, setPhase]       = useState<"idle" | "signing" | "claiming">("idle");
+  const [error, setError]       = useState("");
+  const [txHash, setTxHash]     = useState("");
   const [showResult, setShowResult] = useState(false);
 
   async function submitAction(action: string) {
+    if (!ready) return;
     setLoading(true);
-    const res = await fetch(`/api/rune-arena/battles/${battle.id}/action`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, passport_id: passportId }),
-    });
-    const data = await res.json();
-    if (data.battle) {
-      onUpdate(data.battle);
-      // Update HP from API response
-      if (typeof data.player_hp === "number") setPlayerHP(data.player_hp);
-      if (typeof data.opp_hp    === "number") setOppHP(data.opp_hp);
-      if (data.battle.status === "finished")  setShowResult(true);
+    setError("");
+    setPhase("signing");
+    try {
+      const out = await submitBattleAction(write, {
+        battleId: battle.id,
+        passportId,
+        action,
+      });
+      setTxHash(out.tx.hash);
+      if (out.battle) {
+        onUpdate(out.battle);
+        const next = deriveHP(out.battle, init);
+        setPlayerHP(next.playerHP);
+        setOppHP(next.oppHP);
+        if (out.battle.status === "finished") {
+          // Try to claim reward on-chain
+          setPhase("claiming");
+          try {
+            const claim = await claimBattleReward(write, { battleId: battle.id, passportId });
+            if (claim.battle) onUpdate(claim.battle);
+          } catch (claimErr) {
+            console.error("Reward claim failed", claimErr);
+          }
+          setShowResult(true);
+        }
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setLoading(false);
+      setPhase("idle");
     }
-    setLoading(false);
   }
 
   const playerPct = Math.max(0, Math.min(100, playerHP));
@@ -55,7 +91,6 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
 
   return (
     <div className="space-y-4">
-      {/* Battle header */}
       <div className="rounded-2xl p-6 border" style={{ background: "rgba(249,115,115,0.08)", borderColor: "rgba(249,115,115,0.3)" }}>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -69,7 +104,6 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
           </div>
         </div>
 
-        {/* HP bars */}
         <div className="space-y-2">
           <div className="h-2 rounded-full" style={{ background: "var(--surface-soft)" }}>
             <div className="h-full rounded-full transition-all duration-300"
@@ -86,10 +120,31 @@ export function RuneArenaBattle({ battle, passportId, onUpdate }: RuneArenaBattl
         </div>
       </div>
 
-      {/* Narration */}
       <BattleNarrationPanel narration={battle.narration} />
 
-      {/* Actions */}
+      {loading && (
+        <div className="p-3 rounded-lg text-sm flex items-center gap-2 shimmer"
+          style={{ background: "rgba(56,217,248,0.06)", color: "var(--pixel-cyan)" }}>
+          <span className="animate-spin">⟳</span>
+          {phase === "signing" && "GenLayer LLM is adjudicating the turn…"}
+          {phase === "claiming" && "Minting your reward item on-chain…"}
+        </div>
+      )}
+
+      {txHash && (
+        <div className="p-2 rounded text-xs font-mono break-all"
+          style={{ background: "var(--surface-soft)", color: "var(--text-muted)" }}>
+          tx: {txHash}
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 rounded-lg text-sm"
+          style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+          {error}
+        </div>
+      )}
+
       {battle.status === "active" && (
         <ArenaActionPanel onAction={submitAction} loading={loading} loadout={battle.loadout} />
       )}
