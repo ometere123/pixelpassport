@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { CanonicalItem, ChainFarm } from "@/types";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { useFarmItem } from "@/lib/genlayer/actions";
 
 interface FarmToolPanelProps {
   farmId: string;
@@ -9,8 +11,10 @@ interface FarmToolPanelProps {
 }
 
 export function FarmToolPanel({ farmId, passportId, onUpdate }: FarmToolPanelProps) {
+  const { write, ready } = useGenLayer();
   const [items, setItems] = useState<CanonicalItem[]>([]);
-  const [applying, setApplying] = useState(false);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!passportId) return;
@@ -25,15 +29,22 @@ export function FarmToolPanel({ farmId, passportId, onUpdate }: FarmToolPanelPro
   );
 
   async function applyItem(item: CanonicalItem) {
-    setApplying(true);
-    const res = await fetch(`/api/chain-farm/farms/${farmId}/use-item`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item_id: item.id, item }),
-    });
-    const d = await res.json();
-    if (d.farm) onUpdate(d.farm);
-    setApplying(false);
+    if (!ready) return;
+    setApplying(item.id);
+    setError("");
+    try {
+      const out = await useFarmItem(write, {
+        farmId,
+        itemId: item.id,
+        translatedItem: { ...item },
+        passportId,
+      });
+      if (out.farm) onUpdate(out.farm as unknown as ChainFarm);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Apply failed");
+    } finally {
+      setApplying(null);
+    }
   }
 
   return (
@@ -52,13 +63,25 @@ export function FarmToolPanel({ farmId, passportId, onUpdate }: FarmToolPanelPro
                 <div className="text-sm font-semibold">{item.name}</div>
                 <div className="text-xs" style={{ color: "var(--text-muted)" }}>{item.class}</div>
               </div>
-              <button onClick={() => applyItem(item)} disabled={applying}
+              <button onClick={() => applyItem(item)} disabled={applying !== null}
                 className="px-3 py-1 rounded text-xs font-semibold hover:opacity-80 disabled:opacity-50"
                 style={{ background: "rgba(101,212,110,0.2)", color: "#65D46E" }}>
-                Apply
+                {applying === item.id ? "Applying…" : "Apply"}
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {applying && (
+        <div className="mt-3 p-2 rounded text-xs shimmer"
+          style={{ background: "rgba(101,212,110,0.06)", color: "#65D46E" }}>
+          ⬡ GenLayer LLM evaluating item effect on your farm…
+        </div>
+      )}
+      {error && (
+        <div className="mt-3 p-2 rounded text-xs"
+          style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+          {error}
         </div>
       )}
     </div>

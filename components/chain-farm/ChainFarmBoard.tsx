@@ -4,6 +4,8 @@ import type { ChainFarm, FarmPlot } from "@/types";
 import { FarmPlotCell } from "./FarmPlot";
 import { ResourcePanel } from "./ResourcePanel";
 import { FarmToolPanel } from "./FarmToolPanel";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { plantCrop, harvestCrop } from "@/lib/genlayer/actions";
 
 interface ChainFarmBoardProps {
   farm: ChainFarm;
@@ -12,40 +14,57 @@ interface ChainFarmBoardProps {
 }
 
 export function ChainFarmBoard({ farm, passportId, onUpdate }: ChainFarmBoardProps) {
+  const { write, ready } = useGenLayer();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [txHash, setTxHash] = useState("");
   const [selectedPlot, setSelectedPlot] = useState<FarmPlot | null>(null);
 
   async function plant(plotIndex: number, cropType: string) {
+    if (!ready) return;
     setLoading(true);
-    const res = await fetch(`/api/chain-farm/farms/${farm.id}/plant`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plot_id: `plot_${plotIndex}`, crop: cropType }),
-    });
-    const d = await res.json();
-    if (d.farm) onUpdate(d.farm);
-    setLoading(false);
-    setSelectedPlot(null);
+    setError("");
+    try {
+      const out = await plantCrop(write, {
+        farmId: farm.id,
+        plotId: `plot_${plotIndex}`,
+        crop: cropType,
+        passportId,
+      });
+      setTxHash(out.tx.hash);
+      if (out.farm) onUpdate(out.farm as unknown as ChainFarm);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Plant failed");
+    } finally {
+      setLoading(false);
+      setSelectedPlot(null);
+    }
   }
 
   async function harvest(plotIndex: number) {
+    if (!ready) return;
     setLoading(true);
-    const res = await fetch(`/api/chain-farm/farms/${farm.id}/harvest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plot_id: `plot_${plotIndex}` }),
-    });
-    const d = await res.json();
-    if (d.farm) onUpdate(d.farm);
-    setLoading(false);
+    setError("");
+    try {
+      const out = await harvestCrop(write, {
+        farmId: farm.id,
+        plotId: `plot_${plotIndex}`,
+        passportId,
+      });
+      setTxHash(out.tx.hash);
+      if (out.farm) onUpdate(out.farm as unknown as ChainFarm);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Harvest failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Farm header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{passportId}&apos;s Farm</h1>
+          <h1 className="text-2xl font-bold">Your Farm</h1>
           <div className="text-sm" style={{ color: "var(--text-muted)" }}>
             Level {farm.level} · {farm.xp} XP
           </div>
@@ -56,11 +75,30 @@ export function ChainFarmBoard({ farm, passportId, onUpdate }: ChainFarmBoardPro
         </div>
       </div>
 
-      {/* Plot grid */}
+      {loading && (
+        <div className="p-3 rounded-lg text-sm flex items-center gap-2 shimmer"
+          style={{ background: "rgba(101,212,110,0.06)", color: "#65D46E" }}>
+          <span className="animate-spin">⟳</span>
+          Submitting to ChainFarm contract — waiting for consensus…
+        </div>
+      )}
+      {txHash && !loading && (
+        <div className="p-2 rounded text-xs font-mono break-all"
+          style={{ background: "var(--surface-soft)", color: "var(--text-muted)" }}>
+          last tx: {txHash}
+        </div>
+      )}
+      {error && (
+        <div className="p-3 rounded-lg text-sm"
+          style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+          {error}
+        </div>
+      )}
+
       <div className="rounded-2xl p-6 border" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
         <h2 className="font-bold mb-4">Plots</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {farm.plots.map((plot) => (
+          {(farm.plots ?? []).map((plot) => (
             <FarmPlotCell
               key={plot.id}
               plot={plot}
@@ -72,7 +110,6 @@ export function ChainFarmBoard({ farm, passportId, onUpdate }: ChainFarmBoardPro
         </div>
       </div>
 
-      {/* Plant modal */}
       {selectedPlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.8)" }}>
@@ -97,7 +134,6 @@ export function ChainFarmBoard({ farm, passportId, onUpdate }: ChainFarmBoardPro
         </div>
       )}
 
-      {/* Resources and tools */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ResourcePanel resources={farm.resources} />
         <FarmToolPanel farmId={farm.id} passportId={passportId} onUpdate={onUpdate} />

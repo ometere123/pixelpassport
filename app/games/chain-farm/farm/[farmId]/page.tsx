@@ -4,15 +4,20 @@ import { useParams } from "next/navigation";
 import { useAccount } from "wagmi";
 import { ChainFarmBoard } from "@/components/chain-farm/ChainFarmBoard";
 import { generateId } from "@/lib/utils/cn";
+import { useGenLayer } from "@/lib/genlayer/useGenLayer";
+import { createFarm as createFarmTx } from "@/lib/genlayer/actions";
 import type { ChainFarm } from "@/types";
 
 export default function FarmPage() {
   const params = useParams();
   const farmId = params.farmId as string;
   const { address } = useAccount();
+  const { write, ready } = useGenLayer();
   const [farm, setFarm] = useState<ChainFarm | null>(null);
   const [passportId, setPassportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!address) return;
@@ -35,15 +40,21 @@ export default function FarmPage() {
   }, [farmId]);
 
   async function createFarm() {
-    if (!passportId) return;
-    const newId = generateId("farm");
-    const res = await fetch("/api/chain-farm/farms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ farm_id: newId, passport_id: passportId }),
-    });
-    const d = await res.json();
-    if (d.farm) setFarm(d.farm);
+    if (!passportId || !ready) return;
+    setCreating(true);
+    setError("");
+    try {
+      const newId = generateId("farm");
+      const out = await createFarmTx(write, { farmId: newId, passportId });
+      if (out.farm) {
+        const built = { id: newId, passport_id: passportId, ...out.farm } as unknown as ChainFarm;
+        setFarm(built);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create farm");
+    } finally {
+      setCreating(false);
+    }
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="text-2xl animate-spin">⟳</div></div>;
@@ -54,13 +65,25 @@ export default function FarmPage() {
         <div className="text-4xl mb-4">🌱</div>
         <h1 className="text-xl font-bold mb-2">Create Your Farm</h1>
         <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-          Start fresh on the blockchain plains.
+          Signed by your GenLayer key, recorded on the ChainFarm contract.
         </p>
-        <button onClick={createFarm}
-          className="px-6 py-3 rounded-lg font-semibold text-sm hover:opacity-90"
+        <button onClick={createFarm} disabled={creating}
+          className="px-6 py-3 rounded-lg font-semibold text-sm hover:opacity-90 disabled:opacity-50"
           style={{ background: "#65D46E", color: "#090A12" }}>
-          Create Farm
+          {creating ? "Submitting to GenLayer…" : "Create Farm"}
         </button>
+        {creating && (
+          <div className="mt-4 p-3 rounded-lg text-xs shimmer"
+            style={{ background: "rgba(101,212,110,0.06)", color: "#65D46E" }}>
+            ⬡ Waiting for consensus (30–60s)…
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 p-3 rounded-lg text-sm"
+            style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)" }}>
+            {error}
+          </div>
+        )}
       </div>
     );
   }
